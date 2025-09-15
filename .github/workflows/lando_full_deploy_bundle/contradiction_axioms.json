@@ -1,0 +1,8 @@
+{
+  "axioms": [
+    {
+      "name": "no_self_contradiction",
+      "description": "An utterance should not contradict previous utterances."
+    }
+  ]
+}
