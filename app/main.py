@@ -1,6 +1,7 @@
 import os
 
 from flask import Flask, request, jsonify
+from werkzeug.exceptions import HTTPException
 
 app = Flask(__name__)
 
@@ -81,19 +82,32 @@ def _agent_mode(message):
 def _agent_response(user_message):
     """Stage-2 lightweight agent orchestration with mode routing metadata."""
     mode = _agent_mode(user_message)
-    reply = _generate_reply(user_message)
+    reply = _safe_generate_reply(user_message)
     return {"reply": reply, "agent": {"mode": mode, "version": "2"}}
 
 
 def _generate_reply(user_message):
     """Generate a chat reply for a validated message."""
+    tokenizer, model = _get_model_components()
+    inputs = tokenizer(user_message, return_tensors="pt")
+    outputs = model.generate(**inputs, max_length=50)
+    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+
+def _safe_generate_reply(user_message):
+    """Always return a reply, even when model generation fails unexpectedly."""
     try:
-        tokenizer, model = _get_model_components()
-        inputs = tokenizer(user_message, return_tensors="pt")
-        outputs = model.generate(**inputs, max_length=50)
-        return tokenizer.decode(outputs[0], skip_special_tokens=True)
-    except (ImportError, OSError, RuntimeError, ValueError):
+        return _generate_reply(user_message)
+    except Exception:
         return _fallback_reply(user_message)
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(error):
+    """Prevent serverless function crashes from uncaught exceptions."""
+    if isinstance(error, HTTPException):
+        return error
+    return jsonify({"error": "internal server error"}), 500
 
 
 @app.route("/", methods=["GET"])
@@ -130,7 +144,7 @@ def chat():
     if len(user_message) > MAX_INPUT_CHARS:
         return jsonify({"error": f"message exceeds {MAX_INPUT_CHARS} characters"}), 400
 
-    reply = _generate_reply(user_message)
+    reply = _safe_generate_reply(user_message)
     return jsonify({"reply": reply})
 
 

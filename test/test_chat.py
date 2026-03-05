@@ -123,3 +123,29 @@ def test_agent_chat_defaults_to_chat_mode(monkeypatch):
     response = client.post("/agent/chat", json={"message": "hello there"})
     assert response.status_code == 200
     assert response.json["agent"]["mode"] == "chat"
+
+
+def test_chat_falls_back_on_unexpected_generation_error(monkeypatch):
+    client = app.test_client()
+
+    def _boom(_):
+        raise Exception("unexpected")
+
+    monkeypatch.setattr("app.main._generate_reply", _boom)
+
+    response = client.post("/chat", json={"message": "hello"})
+    assert response.status_code == 200
+    assert "Lando fallback" in response.json["reply"]
+
+
+def test_global_error_handler_returns_json_500(monkeypatch):
+    client = app.test_client()
+
+    def _explode(_):
+        raise Exception("fatal")
+
+    monkeypatch.setattr("app.main._extract_message", _explode)
+
+    response = client.post("/chat", json={"message": "hello"})
+    assert response.status_code == 500
+    assert response.json == {"error": "internal server error"}

@@ -75,3 +75,9 @@ Use the `@vercel/python` builder form instead:
 
 This repository is already configured this way in `vercel.json`.
 
+
+
+### 500 FUNCTION_INVOCATION_FAILED
+If Vercel shows `This Serverless Function has crashed` / `FUNCTION_INVOCATION_FAILED`, this API now includes a global Flask error handler that returns JSON `{"error":"internal server error"}` instead of an uncaught crash page.
+
+If this still appears, redeploy the latest commit and check function logs for the first exception stack trace.
