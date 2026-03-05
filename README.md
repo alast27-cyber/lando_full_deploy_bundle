@@ -65,3 +65,13 @@ If deployment succeeds but returns `404: NOT_FOUND`, verify:
   - `mode`: lightweight intent routing (`chat`, `planner`, `summarizer`)
   - `version`: current orchestration schema version (`2`)
 - Model initialization now memoizes failures to avoid repeated expensive import/load attempts under constrained environments.
+
+### Error: Function Runtimes must have a valid version
+If Vercel fails with `Function Runtimes must have a valid version`, your `vercel.json` is using an unsupported `functions.runtime` format.
+
+Use the `@vercel/python` builder form instead:
+- `builds[].use = "@vercel/python"`
+- route all traffic to `/api/index.py`
+
+This repository is already configured this way in `vercel.json`.
+
