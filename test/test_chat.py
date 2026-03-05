@@ -49,17 +49,17 @@ def test_chat_rejects_overly_long_message():
     assert response.json == {"error": f"message exceeds {MAX_INPUT_CHARS} characters"}
 
 
-def test_chat_returns_503_if_model_unavailable(monkeypatch):
+def test_chat_uses_fallback_if_model_unavailable(monkeypatch):
     client = app.test_client()
 
-    def _boom(_):
+    def _boom():
         raise RuntimeError("model init failed")
 
-    monkeypatch.setattr("app.main._generate_reply", _boom)
+    monkeypatch.setattr("app.main._get_model_components", _boom)
 
     response = client.post("/chat", json={"message": "hello"})
-    assert response.status_code == 503
-    assert response.json == {"error": "chat model unavailable"}
+    assert response.status_code == 200
+    assert "Lando fallback" in response.json["reply"]
 
 
 def test_chat_returns_generated_reply(monkeypatch):
@@ -70,3 +70,56 @@ def test_chat_returns_generated_reply(monkeypatch):
     response = client.post("/chat", json={"message": "hello"})
     assert response.status_code == 200
     assert response.json == {"reply": "hi from lando"}
+
+
+def test_agent_chat_returns_mode_metadata(monkeypatch):
+    client = app.test_client()
+    monkeypatch.setattr("app.main._generate_reply", lambda _: "planned")
+
+    response = client.post("/agent/chat", json={"message": "please plan the next steps"})
+    assert response.status_code == 200
+    assert response.json["reply"] == "planned"
+    assert response.json["agent"]["mode"] == "planner"
+    assert response.json["agent"]["version"] == "2"
+
+
+def test_agent_chat_requires_message():
+    client = app.test_client()
+    response = client.post("/agent/chat", json={})
+    assert response.status_code == 400
+    assert response.json == {"error": "message is required"}
+
+
+def test_max_input_chars_defaults_when_env_invalid(monkeypatch):
+    import importlib
+    import app.main as main
+
+    monkeypatch.setenv("MAX_INPUT_CHARS", "not-a-number")
+    importlib.reload(main)
+    assert main.MAX_INPUT_CHARS == 1000
+
+    monkeypatch.setenv("MAX_INPUT_CHARS", "0")
+    importlib.reload(main)
+    assert main.MAX_INPUT_CHARS == 1000
+
+    monkeypatch.setenv("MAX_INPUT_CHARS", "42")
+    importlib.reload(main)
+    assert main.MAX_INPUT_CHARS == 42
+
+
+def test_agent_chat_summarizer_mode(monkeypatch):
+    client = app.test_client()
+    monkeypatch.setattr("app.main._generate_reply", lambda _: "summary")
+
+    response = client.post("/agent/chat", json={"message": "please summarize this"})
+    assert response.status_code == 200
+    assert response.json["agent"]["mode"] == "summarizer"
+
+
+def test_agent_chat_defaults_to_chat_mode(monkeypatch):
+    client = app.test_client()
+    monkeypatch.setattr("app.main._generate_reply", lambda _: "ok")
+
+    response = client.post("/agent/chat", json={"message": "hello there"})
+    assert response.status_code == 200
+    assert response.json["agent"]["mode"] == "chat"
