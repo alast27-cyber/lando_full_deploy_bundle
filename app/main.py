@@ -6,6 +6,7 @@ from werkzeug.exceptions import HTTPException
 app = Flask(__name__)
 
 MODEL_NAME = os.getenv("MODEL_NAME", "distilgpt2")
+USE_TRANSFORMERS_MODEL = os.getenv("USE_TRANSFORMERS_MODEL", "0").lower() in {"1", "true", "yes"}
 
 
 def _read_max_input_chars(default=1000):
@@ -96,6 +97,9 @@ def _generate_reply(user_message):
 
 def _safe_generate_reply(user_message):
     """Always return a reply, even when model generation fails unexpectedly."""
+    if not USE_TRANSFORMERS_MODEL:
+        return _fallback_reply(user_message)
+
     try:
         return _generate_reply(user_message)
     except Exception:

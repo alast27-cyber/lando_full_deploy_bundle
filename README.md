@@ -21,7 +21,8 @@ This repo is configured for Vercel Python runtime using `api/index.py` and `verc
 
 Notes:
 - Python is pinned to 3.12 for Vercel compatibility (`.python-version`, `runtime.txt`).
-- The `/chat` endpoint lazy-loads model dependencies. If transformers/model packages are unavailable, the API now returns a lightweight fallback response so deployments still serve traffic.
+- To avoid serverless cold-start crashes, transformer model loading is disabled by default (`USE_TRANSFORMERS_MODEL=0`), and chat endpoints return a lightweight fallback response.
+- Enable full model generation only when your runtime has enough memory/time by setting `USE_TRANSFORMERS_MODEL=1`.
 
 
 ## Vercel troubleshooting

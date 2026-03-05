@@ -65,6 +65,7 @@ def test_chat_uses_fallback_if_model_unavailable(monkeypatch):
 def test_chat_returns_generated_reply(monkeypatch):
     client = app.test_client()
 
+    monkeypatch.setattr("app.main.USE_TRANSFORMERS_MODEL", True)
     monkeypatch.setattr("app.main._generate_reply", lambda _: "hi from lando")
 
     response = client.post("/chat", json={"message": "hello"})
@@ -74,6 +75,7 @@ def test_chat_returns_generated_reply(monkeypatch):
 
 def test_agent_chat_returns_mode_metadata(monkeypatch):
     client = app.test_client()
+    monkeypatch.setattr("app.main.USE_TRANSFORMERS_MODEL", True)
     monkeypatch.setattr("app.main._generate_reply", lambda _: "planned")
 
     response = client.post("/agent/chat", json={"message": "please plan the next steps"})
@@ -109,6 +111,7 @@ def test_max_input_chars_defaults_when_env_invalid(monkeypatch):
 
 def test_agent_chat_summarizer_mode(monkeypatch):
     client = app.test_client()
+    monkeypatch.setattr("app.main.USE_TRANSFORMERS_MODEL", True)
     monkeypatch.setattr("app.main._generate_reply", lambda _: "summary")
 
     response = client.post("/agent/chat", json={"message": "please summarize this"})
@@ -118,6 +121,7 @@ def test_agent_chat_summarizer_mode(monkeypatch):
 
 def test_agent_chat_defaults_to_chat_mode(monkeypatch):
     client = app.test_client()
+    monkeypatch.setattr("app.main.USE_TRANSFORMERS_MODEL", True)
     monkeypatch.setattr("app.main._generate_reply", lambda _: "ok")
 
     response = client.post("/agent/chat", json={"message": "hello there"})
@@ -149,3 +153,17 @@ def test_global_error_handler_returns_json_500(monkeypatch):
     response = client.post("/chat", json={"message": "hello"})
     assert response.status_code == 500
     assert response.json == {"error": "internal server error"}
+
+
+def test_chat_uses_fallback_when_model_disabled(monkeypatch):
+    client = app.test_client()
+
+    monkeypatch.setattr("app.main.USE_TRANSFORMERS_MODEL", False)
+    def _boom(_):
+        raise Exception("should not run")
+
+    monkeypatch.setattr("app.main._generate_reply", _boom)
+
+    response = client.post("/chat", json={"message": "hello"})
+    assert response.status_code == 200
+    assert "Lando fallback" in response.json["reply"]
